@@ -14,37 +14,97 @@ const app = express();
 app.use(cors.default());
 app.use(express.json());
 
+const port = process.env.PORT || 8080;
+
 const server = http.createServer(app);
 const webSocketServer = new WebSocket.Server({ server });
 const users: UserModel[] = [];
 const posts: PostModel[] = [];
 let userWebSockets: UserWebSocket[] = [];
 
-app.listen(process.env.PORT || 8080, () => {
-  console.log("Server started");
-});
-
-server.listen(process.env.PORT || 8081, () => {
+server.listen(port, () => {
   console.log("Server started");
 });
 
 webSocketServer.on("connection", (socket: WebSocket) => {
   let localname = "";
   console.log("client connected");
-  socket.send(
-    JSON.stringify({
-      type: "post",
-      data: posts,
-    })
-  );
 
   socket.on("message", (data: string) => {
     const response = JSON.parse(data);
+
+    if (response.type === "registration") {
+      const credentials = response.data;
+      const user = users.find((e) => e.nickname === credentials.nickname);
+
+      const data = {
+        err: false,
+        message: "Пользователь создан",
+        data: {
+          nickname: "",
+        },
+      };
+
+      if (user) {
+        data.err = true;
+        data.message = "Пользователь уже существует";
+      } else {
+        createUser(credentials.nickname, credentials.pass).then((us) => {
+          users.push(us);
+        });
+        data.data.nickname = credentials.nickname;
+      }
+
+      socket.send(
+        JSON.stringify({
+          type: "registration",
+          data,
+        })
+      );
+    }
+
+    if (response.type === "auth") {
+      const credentials = response.data;
+      const user = users.find((e) => e.nickname === credentials.nickname);
+
+      const data = {
+        err: false,
+        message: "Успешный вход",
+        data: {
+          nickname: "",
+        },
+      };
+
+      if (!user) {
+        data.err = true;
+        data.message = "Неправильный логин / пароль";
+      }
+
+      if (user) {
+        passCheck(credentials.pass, user.pass).then((e) => {
+          if (!e) {
+            data.err = true;
+            data.message = "Неправильный логин / пароль";
+          } else {
+            data.data.nickname = user.nickname
+          }
+        });
+      }
+
+      socket.send(JSON.stringify({ type: "auth", data }));
+    }
 
     if (response.type === "login") {
       const user = response.data;
       localname = user.nickname;
       userWebSockets.push({ name: user.nickname, socket });
+
+      socket.send(
+        JSON.stringify({
+          type: "post",
+          data: posts,
+        })
+      );
 
       webSocketServer.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
@@ -144,69 +204,4 @@ webSocketServer.on("connection", (socket: WebSocket) => {
       });
     });
   });
-});
-
-app.post("/login", (req, res) => {
-  const user = users.find((e) => e.nickname === req.body.nickname);
-
-  if (!user) {
-    const data = {
-      err: true,
-      message: "Неправильный логин / пароль",
-    };
-
-    res.send(JSON.stringify(data));
-  }
-
-  if (user) {
-    passCheck(req.body.pass, user.pass).then((e) => {
-      if (!e) {
-        const data = {
-          err: true,
-          message: "Неправильный логин / пароль",
-        };
-
-        res.send(JSON.stringify(data));
-      } else {
-        const data = {
-          err: false,
-          message: "Успешный вход",
-          data: {
-            nickname: user.nickname,
-          },
-        };
-
-        res.send(JSON.stringify(data));
-      }
-    });
-  }
-});
-
-app.post("/register", (req, res) => {
-  const user = users.find((e) => e.nickname === req.body.nickname);
-
-  if (user) {
-    const data = {
-      err: true,
-      message: "Пользователь уже существует",
-    };
-
-    res.send(JSON.stringify(data));
-  }
-
-  if (!user) {
-    createUser(req.body.nickname, req.body.pass).then((us) => {
-      users.push(us);
-    });
-
-    const data = {
-      err: false,
-      message: "Пользователь создан",
-      data: {
-        nickname: req.body.nickname,
-      },
-    };
-
-    res.send(JSON.stringify(data));
-  }
 });
