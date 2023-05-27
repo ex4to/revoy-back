@@ -1,5 +1,4 @@
 import express from "express";
-import * as http from "http";
 import * as WebSocket from "ws";
 import * as cors from "cors";
 import {
@@ -16,15 +15,10 @@ app.use(express.json());
 
 const port = process.env.PORT || 8080;
 
-const server = http.createServer(app);
-const webSocketServer = new WebSocket.Server({ server });
+const webSocketServer = new WebSocket.Server({ port: +port });
 const users: UserModel[] = [];
 const posts: PostModel[] = [];
 let userWebSockets: UserWebSocket[] = [];
-
-server.listen(port, () => {
-  console.log("Server started");
-});
 
 webSocketServer.on("connection", (socket: WebSocket) => {
   let localname = "";
@@ -86,7 +80,7 @@ webSocketServer.on("connection", (socket: WebSocket) => {
             data.err = true;
             data.message = "Неправильный логин / пароль";
           } else {
-            data.data.nickname = user.nickname
+            data.data.nickname = user.nickname;
           }
         });
       }
