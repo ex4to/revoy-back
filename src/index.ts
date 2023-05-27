@@ -13,9 +13,8 @@ const app = express();
 app.use(cors.default());
 app.use(express.json());
 
-const port = process.env.PORT || 8080;
-
-const webSocketServer = new WebSocket.Server({ port: +port });
+const port = 8080;
+const webSocketServer = new WebSocket.Server({ port });
 const users: UserModel[] = [];
 const posts: PostModel[] = [];
 let userWebSockets: UserWebSocket[] = [];
