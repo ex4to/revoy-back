@@ -1,4 +1,5 @@
 import express from "express";
+import * as http from "http";
 import * as WebSocket from "ws";
 import * as cors from "cors";
 import {
@@ -13,11 +14,20 @@ const app = express();
 app.use(cors.default());
 app.use(express.json());
 
-const port = 8080;
-const webSocketServer = new WebSocket.Server({ port });
+const port = process.env.PORT || 8080;
+const server = http.createServer(app);
+const webSocketServer = new WebSocket.Server({ server });
 const users: UserModel[] = [];
 const posts: PostModel[] = [];
 let userWebSockets: UserWebSocket[] = [];
+
+server.listen(8080)
+
+server.on("upgrade", (req, socket, head) => {
+  webSocketServer.handleUpgrade(req, socket, head, (ws) => {
+    webSocketServer.emit("connection", ws, req);
+  });
+});
 
 webSocketServer.on("connection", (socket: WebSocket) => {
   let localname = "";
