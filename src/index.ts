@@ -71,6 +71,7 @@ webSocketServer.on("connection", (socket: WebSocket) => {
       if (!user) {
         data.err = true;
         data.message = "Неправильный логин / пароль";
+        socket.send(JSON.stringify({ type: "auth", data }));
       }
 
       if (user) {
@@ -78,13 +79,13 @@ webSocketServer.on("connection", (socket: WebSocket) => {
           if (!e) {
             data.err = true;
             data.message = "Неправильный логин / пароль";
+            socket.send(JSON.stringify({ type: "auth", data }));
           } else {
             data.data.nickname = user.nickname;
+            socket.send(JSON.stringify({ type: "auth", data }));
           }
         });
       }
-
-      socket.send(JSON.stringify({ type: "auth", data }));
     }
 
     if (response.type === "login") {
@@ -131,7 +132,9 @@ webSocketServer.on("connection", (socket: WebSocket) => {
           } else {
             e.talks.forEach((el) => {
               if (el.interlocutor === to) {
-                el.messages.push({ sender: from, text: message || "" });
+                if (message) {
+                  el.messages.push({ sender: from, text: message });
+                }
               }
             });
           }
@@ -141,7 +144,9 @@ webSocketServer.on("connection", (socket: WebSocket) => {
           } else {
             e.talks.forEach((el) => {
               if (el.interlocutor === from) {
-                el.messages.push({ sender: from, text: message || "" });
+                if (message) {
+                  el.messages.push({ sender: from, text: message });
+                }
               }
             });
           }
@@ -153,7 +158,7 @@ webSocketServer.on("connection", (socket: WebSocket) => {
 
       webSocketServer.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
-          if (toUser[0].socket === client) {
+          if (toUser[0] && toUser[0].socket === client) {
             const toUserTalks = users.filter(
               (e) => e.nickname === toUser[0].name
             )[0].talks;
@@ -182,6 +187,22 @@ webSocketServer.on("connection", (socket: WebSocket) => {
         }
       });
     }
+
+    socket.on("error", () => {
+      userWebSockets = userWebSockets.filter((e) => e.name !== localname);
+      localname = "";
+      webSocketServer.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          const message = {
+            type: "online",
+            data: userWebSockets.map((e) => e.name),
+          };
+          client.send(JSON.stringify(message));
+        }
+      });
+
+      socket.close();
+    });
 
     socket.on("close", () => {
       userWebSockets = userWebSockets.filter((e) => e.name !== localname);
